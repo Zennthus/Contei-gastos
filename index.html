@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#181b22" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Contei-Gastos">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <title>Contei-Gastos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb; --card: #ffffff; --texto: #111827; --suave: #6b7280; --borda: #e5e7eb;
+      --primaria: #4f46e5; --primaria-h: #4338ca;
+      --ok: #16a34a; --alerta: #f59e0b; --perigo: #dc2626;
+      --sombra: 0 1px 3px rgba(0,0,0,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115; --card: #181b22; --texto: #e5e7eb; --suave: #9aa3b2; --borda: #2a2f3a;
+        --sombra: none;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--texto); }
+    .oculto { display: none !important; }
+    button { font: inherit; cursor: pointer; }
+    input, select, textarea {
+      font: inherit; color: inherit; background: var(--card);
+      border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; width: 100%;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--primaria); outline-offset: -1px; }
+    input[type=checkbox] { width: auto; }
+
+    .btn { background: var(--primaria); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-weight: 600; }
+    .btn:hover { background: var(--primaria-h); }
+    .btn:disabled { opacity: .6; cursor: wait; }
+    .btn.sec { background: transparent; color: var(--texto); border: 1px solid var(--borda); }
+    .btn.sec:hover { background: var(--borda); }
+    .btn.peq { padding: 6px 10px; font-size: .85rem; }
+    .btn.perigo { background: var(--perigo); }
+    .btn.perigo:hover { background: #b91c1c; }
+    .btn.nota { background: #0f766e; }
+    .btn.nota:hover { background: #115e59; }
+    .btn.cheio { width: 100%; margin-bottom: 14px; padding: 12px 16px; }
+
+    .card { background: var(--card); border-radius: 14px; padding: 18px; box-shadow: var(--sombra); border: 1px solid var(--borda); }
+    .card h2 { margin: 0 0 14px; font-size: 1.05rem; }
+
+    /* Login */
+    .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+    .login .card { width: 100%; max-width: 380px; }
+    .login h1 { margin: 0 0 4px; }
+    .login p.sub { margin: 0 0 18px; color: var(--suave); }
+    .login form { display: grid; gap: 10px; }
+    .linha-botoes { display: flex; gap: 10px; }
+    .linha-botoes .btn { flex: 1; }
+    #msg { color: var(--perigo); min-height: 1.2em; margin: 10px 0 0; font-size: .9rem; }
+
+    /* Topo e abas */
+    .topo { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--borda); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .logo { font-weight: 800; font-size: 1.15rem; }
+    .topo-dir { display: flex; align-items: center; gap: 10px; color: var(--suave); font-size: .85rem; }
+    main { max-width: 860px; margin: 0 auto; padding: 20px 16px 50px; }
+    .abas { display: flex; gap: 6px; background: var(--card); padding: 6px; border-radius: 12px; border: 1px solid var(--borda); margin-bottom: 16px; }
+    .abas button { flex: 1; border: none; background: transparent; color: var(--suave); padding: 10px 4px; border-radius: 8px; font-weight: 600; }
+    .abas button.ativa { background: var(--primaria); color: #fff; }
+
+    .barra-mes { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
+    .barra-mes strong { min-width: 170px; text-align: center; }
+    .barra-mes button { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--borda); background: var(--card); color: var(--texto); font-size: 1.2rem; }
+
+    /* Resumo */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .mini { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 16px; box-shadow: var(--sombra); }
+    .mini span { display: block; color: var(--suave); font-size: .8rem; margin-bottom: 6px; }
+    .mini strong { font-size: 1.35rem; }
+    .mini small { display: block; margin-top: 4px; color: var(--suave); font-size: .78rem; }
+    .barra-linha { margin-bottom: 14px; }
+    .barra-linha .topo-barra { display: flex; justify-content: space-between; font-size: .9rem; margin-bottom: 6px; gap: 8px; }
+    .barra-linha .rotulo { display: flex; align-items: center; gap: 8px; }
+    .trilho { height: 10px; background: var(--borda); border-radius: 99px; overflow: hidden; }
+    .preenchimento { height: 100%; border-radius: 99px; }
+    .vazio { color: var(--suave); text-align: center; padding: 24px 0; }
+
+    /* Comparar */
+    .comp-selects { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: end; }
+    .comp-vs { color: var(--suave); padding-bottom: 12px; font-size: .9rem; }
+    .comp-frase { margin-bottom: 16px; font-size: 1.02rem; line-height: 1.5; }
+    .comp-barra { display: grid; grid-template-columns: 64px 1fr 100px; gap: 8px; align-items: center; margin-top: 6px; font-size: .8rem; color: var(--suave); }
+    .comp-val { text-align: right; color: var(--texto); }
+
+    /* Listas */
+    .filtros { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .total-bar { margin-bottom: 12px; padding: 14px 18px; }
+    .total-bar strong { font-size: 1.2rem; }
+    ul.lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .item { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; box-shadow: var(--sombra); }
+    .ponto { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-info strong { display: block; overflow-wrap: anywhere; }
+    .item-info small { display: block; color: var(--suave); margin-top: 3px; overflow-wrap: anywhere; }
+    .selo { display: inline-block; margin-top: 6px; font-size: .72rem; background: var(--borda); border-radius: 99px; padding: 2px 8px; color: var(--suave); }
+    .item-dir { text-align: right; flex-shrink: 0; }
+    .valor { display: block; font-weight: 700; margin-bottom: 8px; }
+    .acoes { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+    .item.g-ok { border-left: 6px solid var(--ok); }
+    .item.g-alerta { border-left: 6px solid var(--alerta); }
+    .item.g-vencida { border-left: 6px solid var(--perigo); opacity: .8; }
+
+    .anuncio { margin-top: 18px; min-height: 90px; text-align: center; }
+
+    /* Formulário */
+    dialog { border: none; border-radius: 16px; padding: 0; width: min(520px, 94vw); max-height: 92vh; background: var(--card); color: var(--texto); }
+    dialog::backdrop { background: rgba(0,0,0,.55); }
+    #form-gasto { padding: 22px; display: grid; gap: 12px; }
+    #form-gasto h2 { margin: 0 0 4px; }
+    .campo label { display: block; font-size: .85rem; color: var(--suave); margin-bottom: 5px; }
+    .campo .ajuda { font-size: .78rem; color: var(--suave); margin-top: 4px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .linha { display: flex; gap: 8px; }
+    .linha select { flex: 1; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: .95rem; }
+    .rodape-form { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+    @media (max-width: 560px) {
+      .grid2, .filtros { grid-template-columns: 1fr; }
+      .comp-selects { grid-template-columns: 1fr; }
+      .comp-vs { display: none; }
+      .item { flex-wrap: wrap; }
+      .item-dir { width: 100%; text-align: left; }
+      .acoes { justify-content: flex-start; }
+      .topo-dir #usuario { display: none; }
+      .abas button { font-size: .85rem; }
+    }
+
+    /* ====== AJUSTES PARA CELULAR ====== */
+    html { -webkit-text-size-adjust: 100%; }
+    body { -webkit-tap-highlight-color: transparent; }
+    button, select, label { touch-action: manipulation; }
+    .login { min-height: 100vh; min-height: 100dvh; }
+    .grid2 > * { min-width: 0; }
+    input[type=date], input[type=file] { min-width: 0; max-width: 100%; }
+    input[type=date] { min-height: 44px; }
+    .topo {
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      padding-left: calc(20px + env(safe-area-inset-left, 0px));
+      padding-right: calc(20px + env(safe-area-inset-right, 0px));
+    }
+    dialog form { padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)) !important; }
+
+    @media (max-width: 560px) {
+      /* 16px nos campos: evita o zoom automático do iPhone ao digitar */
+      input, select, textarea { font-size: 16px; }
+      input, select { min-height: 46px; }
+
+      .topo { padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px; }
+      .topo-dir { gap: 6px; flex-wrap: nowrap; }
+      .topo-dir .rot { display: none; }
+      .topo-dir .btn.peq { min-height: 40px; padding: 8px 12px; }
+
+      /* --sel: espaço reservado para o selo "Powered by Netlify" (plano grátis), que fica fixo no canto inferior */
+      :root { --sel: 64px; }
+      main { padding: 14px 12px calc(92px + var(--sel) + env(safe-area-inset-bottom, 0px)); }
+
+      /* abas fixas embaixo, ao alcance do polegar */
+      .abas {
+        position: fixed; left: 8px; right: 8px; bottom: calc(var(--sel) + env(safe-area-inset-bottom, 0px)); z-index: 6; margin: 0;
+        border-radius: 14px; border-width: 1px;
+        box-shadow: 0 6px 20px rgba(0,0,0,.45);
+        padding: 6px;
+      }
+      .abas button { min-height: 46px; font-size: .9rem; }
+
+      .btn.peq { min-height: 40px; padding: 8px 12px; }
+      .btn.cheio { padding: 14px 16px; }
+      .barra-mes { gap: 10px; }
+      .barra-mes strong { min-width: 0; flex: 1; }
+      .barra-mes button { width: 44px; height: 44px; }
+      .mini strong { font-size: 1.2rem; }
+
+      /* formulários sobem de baixo, como no app de banco */
+      dialog {
+        width: 100vw; max-width: 100vw; max-height: 92vh; max-height: 92dvh;
+        margin: auto 0 0; border-radius: 18px 18px 0 0;
+      }
+      .rodape-form .btn { flex: 1; padding: 13px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="tela-login" class="login">
+    <div class="card">
+      <h1>💸 Contei-Gastos</h1>
+      <p class="sub">Seus gastos, notas e garantias num só lugar.</p>
+      <form id="form-auth">
+        <input type="email" id="email" placeholder="E-mail" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" required>
+        <input type="password" id="senha" placeholder="Senha (mín. 6 caracteres)" minlength="6" autocomplete="current-password" required>
+        <div id="bloco-whats" class="oculto">
+        <input type="tel" id="cad-whats" inputmode="tel" placeholder="Seu WhatsApp com DDD: (41) 99999-9999" maxlength="20">
+        <p style="margin:6px 0 0;font-size:.8rem;color:var(--suave)">Obrigatório para criar a conta. Só enviaremos lembretes se você ativar depois.</p>
+        </div>
+        <div class="linha-botoes">
+          <button type="submit" class="btn">Entrar</button>
+          <button type="button" id="btn-cadastrar" class="btn sec">Criar conta</button>
+        </div>
+      </form>
+      <p id="msg"></p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="tela-app" class="oculto">
+    <header class="topo">
+      <div class="logo">💸 Contei-Gastos</div>
+      <div class="topo-dir">
+        <span id="usuario"></span>
+        <button id="btn-sair" class="btn sec peq">Sair</button>
+      </div>
+    </header>
+
+    <main>
+      <nav class="abas">
+        <button data-aba="resumo" class="ativa">Resumo</button>
+        <button data-aba="gastos">Gastos</button>
+        <button data-aba="comparar">Comparar</button>
+        <button data-aba="garantias">Garantias</button>
+      </nav>
+
+      <div id="barra-mes" class="barra-mes">
+        <button id="mes-ant" aria-label="Mês anterior">‹</button>
+        <strong id="mes-label"></strong>
+        <button id="mes-prox" aria-label="Próximo mês">›</button>
+      </div>
+
+      <!-- Resumo -->
+      <section id="aba-resumo">
+        <button class="btn cheio btn-novo">+ Novo gasto</button>
+        <div id="resumo-cards" class="cards"></div>
+        <div class="card">
+          <h2>Gastos por categoria</h2>
+          <div id="resumo-grafico"></div>
+        </div>
+        <div class="anuncio oculto"></div>
+      </section>
+
+      <!-- Gastos -->
+      <section id="aba-gastos" class="oculto">
+        <div class="filtros">
+          <input type="search" id="busca" placeholder="Buscar por descrição ou loja">
+          <select id="filtro-cat"></select>
+        </div>
+        <button class="btn cheio btn-novo">+ Novo gasto</button>
+        <div class="card total-bar">
+          <small id="gastos-qtd" style="color:var(--suave)"></small><br>
+          <strong id="gastos-total"></strong>
+        </div>
+        <ul id="lista-gastos" class="lista"></ul>
+        <div class="anuncio oculto"></div>
+      </section>
+
+      <!-- Comparar -->
+      <section id="aba-comparar" class="oculto">
+        <div class="card" style="margin-bottom:16px">
+          <div class="comp-selects">
+            <div class="campo">
+              <label for="comp-a">De</label>
+              <select id="comp-a"></select>
+            </div>
+            <div class="comp-vs">para</div>
+            <div class="campo">
+              <label for="comp-b">Para</label>
+              <select id="comp-b"></select>
+            </div>
+          </div>
+        </div>
+        <div id="comp-resultado"></div>
+      </section>
+
+      <!-- Garantias -->
+      <section id="aba-garantias" class="oculto">
+        <button class="btn cheio btn-novo">+ Novo gasto</button>
+        <div class="filtros" style="grid-template-columns:1fr">
+          <select id="filtro-garantia">
+            <option value="ativas">Garantias ativas</option>
+            <option value="vencidas">Garantias vencidas</option>
+            <option value="todas">Todas</option>
+          </select>
+        </div>
+        <ul id="lista-garantias" class="lista"></ul>
+      </section>
+    </main>
+
+    <!-- Formulário -->
+    <dialog id="dlg-gasto">
+      <form id="form-gasto">
+        <h2 id="form-titulo">Novo gasto</h2>
+
+        <div class="campo">
+          <label for="f-produto">Descrição</label>
+          <input id="f-produto" required maxlength="120" placeholder="Ex.: Conta de luz, Fone Bluetooth">
+        </div>
+
+        <div class="grid2">
+          <div class="campo">
+            <label for="f-valor">Valor (R$)</label>
+            <input id="f-valor" type="number" step="0.01" min="0" inputmode="decimal" required placeholder="0,00">
+          </div>
+          <div class="campo">
+            <label for="f-data">Data</label>
+            <input id="f-data" type="date" required>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="f-categoria">Categoria</label>
+          <div class="linha">
+            <select id="f-categoria"></select>
+            <button type="button" id="btn-nova-cat" class="btn sec">+ Nova</button>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="f-loja">Loja / Local</label>
+          <input id="f-loja" list="lista-lojas" maxlength="80" placeholder="Ex.: Mercado Central" autocomplete="off">
+          <datalist id="lista-lojas"></datalist>
+        </div>
+
+        <label class="check"><input type="checkbox" id="f-garantia"> Este item tem garantia</label>
+        <div id="bloco-garantia" class="campo oculto">
+          <label for="f-meses">Garantia (meses)</label>
+          <input id="f-meses" type="number" min="1" max="600" placeholder="Ex.: 12">
+        </div>
+
+        <div class="campo">
+          <label for="f-nota">Nota fiscal ou comprovante (foto ou PDF, até 5 MB)</label>
+          <input id="f-nota" type="file" accept="image/*,application/pdf">
+          <div id="f-nota-atual" class="ajuda"></div>
+        </div>
+
+        <div class="campo">
+          <label for="f-obs">Observação (opcional)</label>
+          <textarea id="f-obs" rows="2" maxlength="300"></textarea>
+        </div>
+
+        <div class="rodape-form">
+          <button type="button" id="btn-cancelar" class="btn sec">Cancelar</button>
+          <button type="submit" id="btn-salvar" class="btn">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+
+  <script>
+    // ================= CONFIGURAÇÃO =================
+    const SUPABASE_URL = "https://upupktgddjzlutjfiwxz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_0_HXusP4IVOxAnYzwYL4UA_IaEGnl59";
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const BUCKET = "notas";
+    const TAMANHO_MAX = 5 * 1024 * 1024;
+
+    // Anúncios (Google AdSense). Fica desligado até você ter a conta aprovada.
+    const ADS = { ativo: false, cliente: "ca-pub-SEU_ID", slot: "SEU_SLOT" };
+
+    // Ordem de prioridade das categorias (as demais vêm depois, e as criadas por você por último)
+    const CATEGORIAS_PADRAO = [
+      ["Contas fixas", "#0ea5e9"], ["Mercado", "#f97316"], ["Transporte", "#14b8a6"],
+      ["Alimentação", "#ef4444"], ["Moradia", "#8b5cf6"], ["Saúde", "#ec4899"],
+      ["Educação", "#6366f1"], ["Lazer", "#eab308"], ["Eletrônicos", "#3b82f6"],
+      ["Roupas", "#a855f7"], ["Casa", "#22c55e"], ["Outros", "#64748b"],
+    ];
+    const PALETA = ["#f43f5e", "#06b6d4", "#84cc16", "#d946ef", "#fb923c", "#2dd4bf", "#818cf8", "#facc15"];
+    const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    // ================= ESTADO E UTILITÁRIOS =================
+    const hoje = new Date();
+    const estado = {
+      usuarioId: null,
+      compras: [],
+      categorias: [],
+      mes: { ano: hoje.getFullYear(), mes: hoje.getMonth() },
+      comp: { a: null, b: null },
+      aba: "resumo",
+      editandoId: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+    function el(tag, attrs = {}, ...filhos) {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") e.className = v;
+        else if (k === "text") e.textContent = v;
+        else if (k === "style") e.style.cssText = v;
+        else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+        else e.setAttribute(k, v);
+      }
+      filhos.flat().filter(Boolean).forEach((f) => e.append(f));
+      return e;
+    }
+
+    function hojeISO() {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 10);
+    }
+    function dataBR(iso) { const [a, m, d] = iso.split("-"); return `${d}/${m}/${a}`; }
+    function chaveDe(ano, mes) { return `${ano}-${String(mes + 1).padStart(2, "0")}`; }
+    function chaveMes() { return chaveDe(estado.mes.ano, estado.mes.mes); }
+    function chaveMesAnterior() { const d = new Date(estado.mes.ano, estado.mes.mes - 1, 1); return chaveDe(d.getFullYear(), d.getMonth()); }
+    function comprasDoMes(chave = chaveMes()) { return estado.compras.filter((c) => c.data_compra.slice(0, 7) === chave); }
+    function somaValores(lista) { return lista.reduce((s, c) => s + (Number(c.valor) || 0), 0); }
+    function corCategoria(nome) { const c = estado.categorias.find((x) => x.nome === nome); return c ? c.cor : "#94a3b8"; }
+
+    function rotuloMes(chave) {
+      const [a, m] = chave.split("-");
+      const t = new Date(Number(a), Number(m) - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    function rotuloCurto(chave) {
+      const [a, m] = chave.split("-");
+      return `${MESES_CURTOS[Number(m) - 1]}/${a.slice(2)}`;
+    }
+
+    function ordenarCategorias(lista) {
+      const padrao = CATEGORIAS_PADRAO.map(([n]) => n);
+      const peso = (nome) => { const i = padrao.indexOf(nome); return i === -1 ? 1000 : i; };
+      return [...lista].sort((a, b) => peso(a.nome) - peso(b.nome) || a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+
+    function calcularVencimento(dataCompra, meses) {
+      const d = new Date(dataCompra + "T00:00:00");
+      d.setMonth(d.getMonth() + Number(meses));
+      return d;
+    }
+    function diasRestantes(venc) {
+      const h = new Date(); h.setHours(0, 0, 0, 0);
+      return Math.ceil((venc - h) / 86400000);
+    }
+
+    // ================= LOGIN =================
+    function mostrarMsg(t) { $("msg").textContent = t || ""; }
+    function credenciais() { return { email: $("email").value.trim(), password: $("senha").value }; }
+
+    $("form-auth").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      mostrarMsg("");
+      const { error } = await db.auth.signInWithPassword(credenciais());
+      if (error) mostrarMsg("Não foi possível entrar: " + error.message);
+    });
+
+    function normalizarWhats(texto) {
+      let d = texto.replace(/\D/g, "");
+      if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+      return d.length === 10 || d.length === 11 ? "55" + d : null;
+    }
+
+    $("btn-cadastrar").addEventListener("click", async () => {
+      mostrarMsg("");
+      const botao = $("btn-cadastrar");
+
+      // 1º clique: mostra o campo do WhatsApp
+      if ($("bloco-whats").classList.contains("oculto")) {
+        $("bloco-whats").classList.remove("oculto");
+        botao.textContent = "Finalizar cadastro";
+        $("cad-whats").focus();
+        return;
+      }
+
+      // 2º clique: valida e cria a conta
+      const c = credenciais();
+      if (!c.email || c.password.length < 6) return mostrarMsg("Preencha e-mail e uma senha de 6+ caracteres.");
+      const numero = normalizarWhats($("cad-whats").value);
+      if (!numero) return mostrarMsg("Informe seu WhatsApp com DDD, por exemplo (41) 99999-9999.");
+
+      const { data, error } = await db.auth.signUp({ ...c, options: { data: { whatsapp: numero } } });
+      if (error) return mostrarMsg("Erro ao criar conta: " + error.message);
+      if (!data.session) mostrarMsg("Conta criada. Confirme o e-mail para entrar.");
+    });
+
+    $("btn-sair").addEventListener("click", () => db.auth.signOut());
+
+    db.auth.onAuthStateChange((_ev, sessao) => {
+      if (sessao) {
+        if (estado.usuarioId === sessao.user.id) return;
+        estado.usuarioId = sessao.user.id;
+        estado.whatsappCadastro = sessao.user.user_metadata?.whatsapp || null;
+        $("tela-login").classList.add("oculto");
+        $("tela-app").classList.remove("oculto");
+        $("usuario").textContent = sessao.user.user_metadata?.nome || sessao.user.email;
+        setTimeout(iniciarApp, 0);
+      } else {
+        estado.usuarioId = null;
+        estado.compras = [];
+        estado.categorias = [];
+        $("tela-app").classList.add("oculto");
+        $("tela-login").classList.remove("oculto");
+      }
+    });
+
+    // ================= DADOS =================
+    async function carregarCategorias() {
+      let { data, error } = await db.from("categorias").select("*").order("nome");
+      if (error) return alert("Erro ao carregar categorias: " + error.message);
+      if (data.length === 0) {
+        const { error: erroSeed } = await db.from("categorias")
+          .insert(CATEGORIAS_PADRAO.map(([nome, cor]) => ({ nome, cor })));
+        if (erroSeed) return alert("Erro ao criar categorias: " + erroSeed.message);
+        ({ data } = await db.from("categorias").select("*").order("nome"));
+      }
+      estado.categorias = ordenarCategorias(data || []);
+    }
+
+    async function carregarCompras() {
+      const { data, error } = await db.from("compras").select("*").order("data_compra", { ascending: false });
+      if (error) return alert("Erro ao carregar: " + error.message);
+      estado.compras = data;
+    }
+
+    async function sincronizarContato() {
+      const numero = estado.whatsappCadastro;
+      if (!numero) return;
+      const { data } = await db.from("contatos").select("whatsapp").maybeSingle();
+      if (data && data.whatsapp) return;
+      await db.from("contatos").upsert(
+        { user_id: estado.usuarioId, whatsapp: numero, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+    }
+
+    async function iniciarApp() {
+      await sincronizarContato();
+      await carregarCategorias();
+      await carregarCompras();
+      renderTudo();
+      renderAds();
+    }
+
+    // ================= RENDER =================
+    function renderTudo() {
+      renderMes();
+      renderListas();
+      renderResumo();
+      renderGastos();
+      renderComparar();
+      renderGarantias();
+    }
+
+    function renderMes() {
+      $("mes-label").textContent = rotuloMes(chaveMes());
+    }
+
+    function renderListas() {
+      const selForm = $("f-categoria");
+      const valForm = selForm.value;
+      selForm.innerHTML = "";
+      selForm.append(el("option", { value: "", text: "Sem categoria" }));
+      estado.categorias.forEach((c) => selForm.append(el("option", { value: c.nome, text: c.nome })));
+      selForm.value = valForm;
+      if (selForm.selectedIndex === -1) selForm.value = "";
+
+      const selFiltro = $("filtro-cat");
+      const valFiltro = selFiltro.value;
+      selFiltro.innerHTML = "";
+      selFiltro.append(el("option", { value: "", text: "Todas as categorias" }));
+      selFiltro.append(el("option", { value: "__sem", text: "Sem categoria" }));
+      estado.categorias.forEach((c) => selFiltro.append(el("option", { value: c.nome, text: c.nome })));
+      selFiltro.value = valFiltro;
+      if (selFiltro.selectedIndex === -1) selFiltro.value = "";
+
+      const contagem = new Map();
+      estado.compras.forEach((c) => {
+        if (!c.loja) return;
+        const k = c.loja.trim();
+        contagem.set(k, (contagem.get(k) || 0) + 1);
+      });
+      const dl = $("lista-lojas");
+      dl.innerHTML = "";
+      [...contagem.entries()].sort((a, b) => b[1] - a[1]).forEach(([nome]) => dl.append(el("option", { value: nome })));
+    }
+
+    function renderResumo() {
+      const lista = comprasDoMes();
+      const total = somaValores(lista);
+      const ant = somaValores(comprasDoMes(chaveMesAnterior()));
+
+      let comparacao = "Sem dados do mês anterior";
+      if (ant > 0) {
+        const pct = ((total - ant) / ant) * 100;
+        comparacao = `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}% vs mês anterior`;
+      }
+
+      const aVencer = estado.compras.filter((c) => {
+        if (!c.meses) return false;
+        const dias = diasRestantes(calcularVencimento(c.data_compra, c.meses));
+        return dias >= 0 && dias <= 30;
+      }).length;
+
+      const maior = lista.reduce((m, c) => ((Number(c.valor) || 0) > (Number(m?.valor) || 0) ? c : m), null);
+
+      const cards = $("resumo-cards");
+      cards.innerHTML = "";
+      cards.append(
+        el("div", { class: "mini" }, el("span", { text: "Total gasto no mês" }), el("strong", { text: brl.format(total) }), el("small", { text: comparacao })),
+        el("div", { class: "mini" }, el("span", { text: "Lançamentos" }), el("strong", { text: String(lista.length) }), el("small", { text: maior && maior.valor ? `Maior: ${maior.produto}` : "—" })),
+        el("div", { class: "mini" }, el("span", { text: "Garantias vencendo (30 dias)" }), el("strong", { text: String(aVencer) }))
+      );
+
+      const graf = $("resumo-grafico");
+      graf.innerHTML = "";
+      const porCat = {};
+      lista.forEach((c) => {
+        const k = c.categoria || "Sem categoria";
+        porCat[k] = (porCat[k] || 0) + (Number(c.valor) || 0);
+      });
+      const linhas = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+      if (linhas.length === 0 || total === 0) {
+        graf.append(el("div", { class: "vazio", text: "Nenhum gasto neste mês. Toque em “+ Novo gasto” para começar." }));
+        return;
+      }
+      linhas.forEach(([nome, valor]) => {
+        const pct = (valor / total) * 100;
+        graf.append(
+          el("div", { class: "barra-linha" },
+            el("div", { class: "topo-barra" },
+              el("span", { class: "rotulo" }, el("span", { class: "ponto", style: `background:${corCategoria(nome)}` }), el("span", { text: nome })),
+              el("span", { text: `${brl.format(valor)} · ${pct.toFixed(0)}%` })
+            ),
+            el("div", { class: "trilho" }, el("div", { class: "preenchimento", style: `width:${pct}%;background:${corCategoria(nome)}` }))
+          )
+        );
+      });
+    }
+
+    function renderGastos() {
+      const termo = $("busca").value.trim().toLowerCase();
+      const cat = $("filtro-cat").value;
+
+      const lista = comprasDoMes().filter((c) => {
+        if (cat === "__sem" && c.categoria) return false;
+        if (cat && cat !== "__sem" && c.categoria !== cat) return false;
+        if (termo && !(`${c.produto} ${c.loja || ""}`.toLowerCase().includes(termo))) return false;
+        return true;
+      });
+
+      $("gastos-total").textContent = brl.format(somaValores(lista));
+      $("gastos-qtd").textContent = `${lista.length} lançamento(s) no filtro`;
+
+      const ul = $("lista-gastos");
+      ul.innerHTML = "";
+      if (lista.length === 0) {
+        ul.append(el("li", { class: "vazio", text: "Nada encontrado neste mês." }));
+        return;
+      }
+
+      lista.forEach((c) => {
+        const acoes = el("div", { class: "acoes" },
+          el("button", { class: "btn sec peq", text: "Editar", onclick: () => abrirForm(c) }),
+          c.nota_path ? el("button", { class: "btn nota peq", text: "Ver nota", onclick: () => abrirNota(c.nota_path) }) : null,
+          el("button", { class: "btn perigo peq", text: "Excluir", onclick: () => excluir(c) })
+        );
+        ul.append(
+          el("li", { class: "item" },
+            el("span", { class: "ponto", style: `background:${corCategoria(c.categoria)}` }),
+            el("div", { class: "item-info" },
+              el("strong", { text: c.produto }),
+              el("small", { text: [c.loja, c.categoria || "Sem categoria", dataBR(c.data_compra)].filter(Boolean).join(" · ") }),
+              c.observacao ? el("small", { text: c.observacao }) : null,
+              c.meses ? el("span", { class: "selo", text: `Garantia de ${c.meses} mês(es)` }) : null
+            ),
+            el("div", { class: "item-dir" },
+              el("span", { class: "valor", text: c.valor != null ? brl.format(c.valor) : "—" }),
+              acoes
+            )
+          )
+        );
+      });
+    }
+
+    function renderComparar() {
+      // meses disponíveis: os que têm gastos + os últimos 12
+      if (!estado.comp.b) {
+        estado.comp.b = chaveDe(hoje.getFullYear(), hoje.getMonth());
+        const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+        estado.comp.a = chaveDe(ant.getFullYear(), ant.getMonth());
+      }
+      const chaves = new Set(estado.compras.map((c) => c.data_compra.slice(0, 7)));
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        chaves.add(chaveDe(d.getFullYear(), d.getMonth()));
+      }
+      chaves.add(estado.comp.a);
+      chaves.add(estado.comp.b);
+      const ordenadas = [...chaves].sort().reverse();
+
+      [["comp-a", "a"], ["comp-b", "b"]].forEach(([id, k]) => {
+        const sel = $(id);
+        sel.innerHTML = "";
+        ordenadas.forEach((ch) => sel.append(el("option", { value: ch, text: rotuloMes(ch) })));
+        sel.value = estado.comp[k];
+      });
+
+      const A = estado.comp.a, B = estado.comp.b;
+      const listaA = comprasDoMes(A), listaB = comprasDoMes(B);
+      const totA = somaValores(listaA), totB = somaValores(listaB);
+      const dif = totB - totA;
+      const pct = totA > 0 ? (dif / totA) * 100 : null;
+      const corDif = dif > 0 ? "var(--perigo)" : dif < 0 ? "var(--ok)" : "var(--suave)";
+      const sinal = dif > 0 ? "+" : dif < 0 ? "−" : "";
+
+      const box = $("comp-resultado");
+      box.innerHTML = "";
+
+      if (A === B) {
+        box.append(el("div", { class: "card vazio", text: "Escolha dois meses diferentes para comparar." }));
+        return;
+      }
+
+      let frase;
+      if (totA === 0 && totB === 0) frase = "Não há gastos em nenhum dos dois meses.";
+      else if (dif === 0) frase = "Você gastou exatamente o mesmo nos dois meses.";
+      else frase = `Em ${rotuloMes(B)} você gastou ${brl.format(Math.abs(dif))} ${dif > 0 ? "a mais" : "a menos"} do que em ${rotuloMes(A)}${pct !== null ? ` (${Math.abs(pct).toFixed(0)}%)` : ""}.`;
+
+      box.append(
+        el("div", { class: "cards" },
+          el("div", { class: "mini" }, el("span", { text: rotuloMes(A) }), el("strong", { text: brl.format(totA) }), el("small", { text: `${listaA.length} lançamento(s)` })),
+          el("div", { class: "mini" }, el("span", { text: rotuloMes(B) }), el("strong", { text: brl.format(totB) }), el("small", { text: `${listaB.length} lançamento(s)` })),
+          el("div", { class: "mini" }, el("span", { text: "Diferença" }), el("strong", { style: `color:${corDif}`, text: `${sinal}${brl.format(Math.abs(dif))}` }), el("small", { text: pct !== null ? `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}%` : "—" }))
+        ),
+        el("div", { class: "card comp-frase", style: `border-left:6px solid ${corDif}`, text: frase })
+      );
+
+      // por categoria
+      const mapa = {};
+      const somar = (lista, k) => lista.forEach((c) => {
+        const nome = c.categoria || "Sem categoria";
+        if (!mapa[nome]) mapa[nome] = { a: 0, b: 0 };
+        mapa[nome][k] += Number(c.valor) || 0;
+      });
+      somar(listaA, "a");
+      somar(listaB, "b");
+
+      const linhas = Object.entries(mapa).sort((x, y) => Math.max(y[1].a, y[1].b) - Math.max(x[1].a, x[1].b));
+      const cardCat = el("div", { class: "card" }, el("h2", { text: "Por categoria" }));
+
+      if (linhas.length === 0) {
+        cardCat.append(el("div", { class: "vazio", text: "Sem gastos para comparar." }));
+        box.append(cardCat);
+        return;
+      }
+
+      const maximo = Math.max(...linhas.map(([, v]) => Math.max(v.a, v.b)), 1);
+      const barra = (rotulo, valor, cor, opacidade) =>
+        el("div", { class: "comp-barra" },
+          el("span", { text: rotulo }),
+          el("div", { class: "trilho" }, el("div", { class: "preenchimento", style: `width:${(valor / maximo) * 100}%;background:${cor};opacity:${opacidade}` })),
+          el("span", { class: "comp-val", text: brl.format(valor) })
+        );
+
+      linhas.forEach(([nome, v]) => {
+        const d = v.b - v.a;
+        const corD = d > 0 ? "var(--perigo)" : d < 0 ? "var(--ok)" : "var(--suave)";
+        const textoD = d === 0 ? "igual" : `${d > 0 ? "▲ +" : "▼ −"}${brl.format(Math.abs(d))}`;
+        cardCat.append(
+          el("div", { class: "barra-linha" },
+            el("div", { class: "topo-barra" },
+              el("span", { class: "rotulo" }, el("span", { class: "ponto", style: `background:${corCategoria(nome)}` }), el("span", { text: nome })),
+              el("strong", { style: `color:${corD}`, text: textoD })
+            ),
+            barra(rotuloCurto(A), v.a, corCategoria(nome), 0.4),
+            barra(rotuloCurto(B), v.b, corCategoria(nome), 1)
+          )
+        );
+      });
+      box.append(cardCat);
+    }
+
+    function renderGarantias() {
+      const filtro = $("filtro-garantia").value;
+      const lista = estado.compras
+        .filter((c) => c.meses)
+        .map((c) => {
+          const venc = calcularVencimento(c.data_compra, c.meses);
+          return { ...c, venc, dias: diasRestantes(venc) };
+        })
+        .filter((c) => (filtro === "ativas" ? c.dias >= 0 : filtro === "vencidas" ? c.dias < 0 : true))
+        .sort((a, b) => a.venc - b.venc);
+
+      const ul = $("lista-garantias");
+      ul.innerHTML = "";
+      if (lista.length === 0) {
+        ul.append(el("li", { class: "vazio", text: "Nenhuma garantia nesta lista. Ao cadastrar um gasto, marque “Este item tem garantia”." }));
+        return;
+      }
+
+      lista.forEach((c) => {
+        const classe = c.dias < 0 ? "g-vencida" : c.dias <= 30 ? "g-alerta" : "g-ok";
+        const status = c.dias < 0 ? `Venceu há ${Math.abs(c.dias)} dia(s)` : c.dias === 0 ? "Vence hoje" : `Vence em ${c.dias} dia(s)`;
+        ul.append(
+          el("li", { class: `item ${classe}` },
+            el("div", { class: "item-info" },
+              el("strong", { text: c.produto }),
+              el("small", { text: [c.loja, `Comprado em ${dataBR(c.data_compra)}`].filter(Boolean).join(" · ") }),
+              el("small", { text: `${status} · até ${c.venc.toLocaleDateString("pt-BR")}` })
+            ),
+            el("div", { class: "item-dir" },
+              el("div", { class: "acoes" },
+                c.nota_path ? el("button", { class: "btn nota peq", text: "Ver nota", onclick: () => abrirNota(c.nota_path) }) : null,
+                el("button", { class: "btn sec peq", text: "Editar", onclick: () => abrirForm(c) })
+              )
+            )
+          )
+        );
+      });
+    }
+
+    // ================= ABAS E NAVEGAÇÃO =================
+    function mostrarAba(nome) {
+      estado.aba = nome;
+      document.querySelectorAll(".abas button").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === nome));
+      ["resumo", "gastos", "comparar", "garantias"].forEach((a) => $("aba-" + a).classList.toggle("oculto", a !== nome));
+      $("barra-mes").classList.toggle("oculto", nome === "comparar" || nome === "garantias");
+    }
+    document.querySelectorAll(".abas button").forEach((b) => b.addEventListener("click", () => mostrarAba(b.dataset.aba)));
+
+    function mudarMes(delta) {
+      const d = new Date(estado.mes.ano, estado.mes.mes + delta, 1);
+      estado.mes = { ano: d.getFullYear(), mes: d.getMonth() };
+      renderMes(); renderResumo(); renderGastos();
+    }
+    $("mes-ant").addEventListener("click", () => mudarMes(-1));
+    $("mes-prox").addEventListener("click", () => mudarMes(1));
+
+    $("busca").addEventListener("input", renderGastos);
+    $("filtro-cat").addEventListener("change", renderGastos);
+    $("filtro-garantia").addEventListener("change", renderGarantias);
+    $("comp-a").addEventListener("change", (e) => { estado.comp.a = e.target.value; renderComparar(); });
+    $("comp-b").addEventListener("change", (e) => { estado.comp.b = e.target.value; renderComparar(); });
+
+    // ================= FORMULÁRIO =================
+    function alternarGarantia() {
+      $("bloco-garantia").classList.toggle("oculto", !$("f-garantia").checked);
+    }
+    $("f-garantia").addEventListener("change", alternarGarantia);
+
+    function abrirForm(c = null) {
+      estado.editandoId = c ? c.id : null;
+      $("form-titulo").textContent = c ? "Editar gasto" : "Novo gasto";
+      $("f-produto").value = c?.produto || "";
+      $("f-valor").value = c?.valor ?? "";
+      $("f-data").value = c?.data_compra || hojeISO();
+      $("f-categoria").value = c?.categoria || "";
+      if ($("f-categoria").selectedIndex === -1) $("f-categoria").value = "";
+      $("f-loja").value = c?.loja || "";
+      $("f-garantia").checked = !!c?.meses;
+      $("f-meses").value = c?.meses || "";
+      alternarGarantia();
+      $("f-obs").value = c?.observacao || "";
+      $("f-nota").value = "";
+      $("f-nota-atual").textContent = c?.nota_path ? "Já existe uma nota anexada. Escolher outro arquivo substitui a atual." : "";
+      $("dlg-gasto").showModal();
+    }
+
+    document.querySelectorAll(".btn-novo").forEach((b) => b.addEventListener("click", () => abrirForm()));
+    $("btn-cancelar").addEventListener("click", () => $("dlg-gasto").close());
+
+    // Lembra a categoria usada da última vez nessa loja
+    $("f-loja").addEventListener("change", () => {
+      if (estado.editandoId || $("f-categoria").value) return;
+      const loja = $("f-loja").value.trim().toLowerCase();
+      if (!loja) return;
+      const anterior = estado.compras.find((c) => c.loja && c.loja.trim().toLowerCase() === loja && c.categoria);
+      if (anterior) {
+        $("f-categoria").value = anterior.categoria;
+        if ($("f-categoria").selectedIndex === -1) $("f-categoria").value = "";
+      }
+    });
+
+    $("btn-nova-cat").addEventListener("click", async () => {
+      const nome = prompt("Nome da nova categoria:");
+      if (!nome || !nome.trim()) return;
+      const limpo = nome.trim();
+      if (estado.categorias.some((c) => c.nome.toLowerCase() === limpo.toLowerCase())) return alert("Essa categoria já existe.");
+      const cor = PALETA[estado.categorias.length % PALETA.length];
+      const { error } = await db.from("categorias").insert({ nome: limpo, cor });
+      if (error) return alert("Erro ao criar categoria: " + error.message);
+      await carregarCategorias();
+      renderListas();
+      $("f-categoria").value = limpo;
+    });
+
+    $("form-gasto").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const botao = $("btn-salvar");
+      const arquivo = $("f-nota").files[0];
+
+      if (arquivo && arquivo.size > TAMANHO_MAX) return alert("O arquivo é maior que 5 MB.");
+
+      const temGarantia = $("f-garantia").checked;
+      const meses = temGarantia ? Number($("f-meses").value) : null;
+      if (temGarantia && !(meses > 0)) return alert("Informe a garantia em meses.");
+
+      botao.disabled = true;
+      botao.textContent = "Salvando...";
+
+      const antigo = estado.editandoId ? estado.compras.find((c) => c.id === estado.editandoId) : null;
+
+      const dados = {
+        produto: $("f-produto").value.trim(),
+        valor: Number($("f-valor").value),
+        data_compra: $("f-data").value,
+        categoria: $("f-categoria").value || null,
+        loja: $("f-loja").value.trim() || null,
+        meses,
+        observacao: $("f-obs").value.trim() || null,
+      };
+
+      let caminho = null;
+      if (arquivo) {
+        const nomeSeguro = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        caminho = `${estado.usuarioId}/${Date.now()}-${nomeSeguro}`;
+        const { error: erroUp } = await db.storage.from(BUCKET).upload(caminho, arquivo);
+        if (erroUp) {
+          botao.disabled = false; botao.textContent = "Salvar";
+          return alert("Erro ao enviar a nota: " + erroUp.message);
+        }
+        dados.nota_path = caminho;
+      }
+
+      const resposta = estado.editandoId
+        ? await db.from("compras").update(dados).eq("id", estado.editandoId)
+        : await db.from("compras").insert(dados);
+
+      botao.disabled = false;
+      botao.textContent = "Salvar";
+
+      if (resposta.error) {
+        if (caminho) await db.storage.from(BUCKET).remove([caminho]);
+        return alert("Erro ao salvar: " + resposta.error.message);
+      }
+
+      if (caminho && antigo?.nota_path) await db.storage.from(BUCKET).remove([antigo.nota_path]);
+
+      const [ano, mes] = dados.data_compra.split("-");
+      estado.mes = { ano: Number(ano), mes: Number(mes) - 1 };
+
+      $("dlg-gasto").close();
+      await carregarCompras();
+      renderTudo();
+    });
+
+    // ================= AÇÕES =================
+    async function excluir(c) {
+      if (!confirm(`Excluir "${c.produto}"?`)) return;
+      const { error } = await db.from("compras").delete().eq("id", c.id);
+      if (error) return alert("Erro ao excluir: " + error.message);
+      if (c.nota_path) await db.storage.from(BUCKET).remove([c.nota_path]);
+      await carregarCompras();
+      renderTudo();
+    }
+
+    async function abrirNota(caminho) {
+      const aba = window.open("", "_blank");
+      const { data, error } = await db.storage.from(BUCKET).createSignedUrl(caminho, 120);
+      if (error) {
+        if (aba) aba.close();
+        return alert("Erro ao abrir a nota: " + error.message);
+      }
+      if (aba) aba.location = data.signedUrl;
+      else window.location = data.signedUrl;
+    }
+
+       // ================= LEMBRETES NO WHATSAPP =================
+    (function () {
+      const estilo = document.createElement("style");
+      estilo.textContent = `
+        #dlg-lembrete form { padding: 22px; display: grid; gap: 12px; }
+        #dlg-lembrete h2 { margin: 0; }
+        #dlg-lembrete p { margin: 0; color: var(--suave); font-size: .9rem; line-height: 1.5; }
+        #dlg-lembrete .check { align-items: flex-start; line-height: 1.4; }
+        #dlg-lembrete .check input { margin-top: 3px; }
+      `;
+      document.head.append(estilo);
+
+      const dlg = document.createElement("dialog");
+      dlg.id = "dlg-lembrete";
+      dlg.innerHTML = `
+        <form id="form-lembrete">
+          <h2>🔔 Lembretes no WhatsApp</h2>
+
+          <div class="campo">
+            <label for="l-whats">Seu WhatsApp (com DDD)</label>
+            <input id="l-whats" type="tel" inputmode="tel" placeholder="(41) 99999-9999" maxlength="20">
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="l-garantia">
+            <span>Quero avisos de garantia a cada 5 horas, enquanto houver garantia vencendo dentro do prazo abaixo.</span>
+          </label>
+
+          <div class="campo">
+            <label for="l-dias">Começar a avisar quanto tempo antes de vencer</label>
+            <select id="l-dias">
+              <option value="30">30 dias antes</option>
+              <option value="15">15 dias antes</option>
+              <option value="7">7 dias antes</option>
+              <option value="1">1 dia antes</option>
+            </select>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="l-diario">
+            <span>Quero um lembrete todo dia às 21h (horário de Brasília) para anotar meus gastos.</span>
+          </label>
+
+          <p>Você pode desativar qualquer uma das opções aqui, a qualquer momento. Os envios começam quando o serviço de mensagens estiver ativo; por enquanto, suas escolhas ficam salvas.</p>
+
+          <div class="rodape-form">
+            <button type="button" id="l-cancelar" class="btn sec">Cancelar</button>
+            <button type="submit" id="l-salvar" class="btn">Salvar</button>
+          </div>
+        </form>
+      `;
+      $("tela-app").append(dlg);
+
+      const botao = el("button", { class: "btn sec peq", "aria-label": "Lembretes" }, "🔔", el("span", { class: "rot", text: " Lembretes" }));
+      document.querySelector(".topo-dir").insertBefore(botao, $("btn-sair"));
+
+      function formatar(numero55) {
+        const d = numero55.slice(2);
+        const ddd = d.slice(0, 2);
+        const resto = d.slice(2);
+        return resto.length === 9
+          ? `(${ddd}) ${resto.slice(0, 5)}-${resto.slice(5)}`
+          : `(${ddd}) ${resto.slice(0, 4)}-${resto.slice(4)}`;
+      }
+
+      function normalizar(texto) {
+        let d = texto.replace(/\D/g, "");
+        if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+        return d.length === 10 || d.length === 11 ? "55" + d : null;
+      }
+
+      botao.addEventListener("click", async () => {
+        const { data, error } = await db.from("contatos").select("*").maybeSingle();
+        if (error) return alert("Erro ao carregar: " + error.message);
+        $("l-whats").value = data?.whatsapp ? formatar(data.whatsapp) : "";
+        $("l-dias").value = String(data?.dias_antes || 30);
+        $("l-garantia").checked = !!data?.avisar;
+        $("l-diario").checked = !!data?.lembrete_diario;
+        dlg.showModal();
+      });
+
+      $("l-cancelar").addEventListener("click", () => dlg.close());
+
+      $("form-lembrete").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const texto = $("l-whats").value.trim();
+        const garantia = $("l-garantia").checked;
+        const diario = $("l-diario").checked;
+        const numero = texto ? normalizar(texto) : null;
+
+        if (texto && !numero) return alert("Número inválido. Use DDD + número, por exemplo (41) 99999-9999.");
+        if ((garantia || diario) && !numero) return alert("Informe seu WhatsApp para receber os lembretes.");
+
+        const salvar = $("l-salvar");
+        salvar.disabled = true;
+        salvar.textContent = "Salvando...";
+
+        const { error } = await db.from("contatos").upsert({
+          user_id: estado.usuarioId,
+          whatsapp: numero,
+          avisar: garantia,
+          lembrete_diario: diario,
+          dias_antes: Number($("l-dias").value),
+          autorizou_em: (garantia || diario) ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+
+        salvar.disabled = false;
+        salvar.textContent = "Salvar";
+
+        if (error) return alert("Erro ao salvar: " + error.message);
+        dlg.close();
+      });
+    })();
+
+    // ================= CONFIGURAÇÕES DA CONTA =================
+    (function () {
+      const estilo = document.createElement("style");
+      estilo.textContent = `
+        .topo-dir { flex-wrap: wrap; justify-content: flex-end; }
+        #dlg-config form { padding: 22px; display: grid; gap: 12px; }
+        #dlg-config h2 { margin: 0; }
+        #dlg-config h3 { margin: 10px 0 0; font-size: .95rem; }
+        #dlg-config .nota-cfg { margin: 0; color: var(--suave); font-size: .82rem; line-height: 1.45; }
+        #cfg-msg { margin: 0; min-height: 1.2em; font-size: .9rem; line-height: 1.4; }
+        #cfg-msg.erro { color: var(--perigo); }
+        #cfg-msg.ok { color: var(--ok); }
+      `;
+      document.head.append(estilo);
+
+      const dlg = document.createElement("dialog");
+      dlg.id = "dlg-config";
+      dlg.innerHTML = `
+        <form id="form-config">
+          <h2>⚙️ Configurações da conta</h2>
+
+          <div class="campo">
+            <label for="cfg-nome">Nome</label>
+            <input id="cfg-nome" type="text" maxlength="60" autocomplete="name" placeholder="Como você quer ser chamado">
+          </div>
+
+          <div class="campo">
+            <label for="cfg-email">E-mail</label>
+            <input id="cfg-email" type="email" autocomplete="email" required>
+            <p class="nota-cfg" style="margin-top:4px">Ao trocar o e-mail, enviamos um link de confirmação. A troca só vale depois de confirmar.</p>
+          </div>
+
+          <div class="campo">
+            <label for="cfg-whats">WhatsApp (com DDD)</label>
+            <input id="cfg-whats" type="tel" inputmode="tel" placeholder="(41) 99999-9999" maxlength="20" autocomplete="tel">
+          </div>
+
+          <h3>Alterar senha</h3>
+          <p class="nota-cfg">Deixe em branco para manter a senha atual.</p>
+          <div class="grid2">
+            <div class="campo">
+              <label for="cfg-senha">Nova senha</label>
+              <input id="cfg-senha" type="password" minlength="6" autocomplete="new-password">
+            </div>
+            <div class="campo">
+              <label for="cfg-senha2">Repita a nova senha</label>
+              <input id="cfg-senha2" type="password" minlength="6" autocomplete="new-password">
+            </div>
+          </div>
+
+          <p id="cfg-msg"></p>
+
+          <div class="rodape-form">
+            <button type="button" id="cfg-fechar" class="btn sec">Fechar</button>
+            <button type="submit" id="cfg-salvar" class="btn">Salvar alterações</button>
+          </div>
+        </form>
+      `;
+      $("tela-app").append(dlg);
+
+      const botao = el("button", { class: "btn sec peq", "aria-label": "Configurações" }, "⚙️", el("span", { class: "rot", text: " Configurações" }));
+      document.querySelector(".topo-dir").insertBefore(botao, $("btn-sair"));
+
+      let emailAtual = "";
+
+      function mostrar(texto, tipo) {
+        const p = $("cfg-msg");
+        p.textContent = texto || "";
+        p.className = tipo || "";
+      }
+
+      function formatar(numero55) {
+        const d = numero55.slice(2);
+        const ddd = d.slice(0, 2);
+        const resto = d.slice(2);
+        return resto.length === 9
+          ? `(${ddd}) ${resto.slice(0, 5)}-${resto.slice(5)}`
+          : `(${ddd}) ${resto.slice(0, 4)}-${resto.slice(4)}`;
+      }
+
+      botao.addEventListener("click", async () => {
+        mostrar("");
+        const { data: u, error } = await db.auth.getUser();
+        if (error || !u?.user) return alert("Não foi possível carregar sua conta. Entre novamente.");
+        const user = u.user;
+        emailAtual = user.email || "";
+
+        const { data: contato } = await db.from("contatos").select("whatsapp").maybeSingle();
+        const numero = contato?.whatsapp || user.user_metadata?.whatsapp || "";
+
+        $("cfg-nome").value = user.user_metadata?.nome || "";
+        $("cfg-email").value = emailAtual;
+        $("cfg-whats").value = numero ? formatar(numero) : "";
+        $("cfg-senha").value = "";
+        $("cfg-senha2").value = "";
+        dlg.showModal();
+      });
+
+      $("cfg-fechar").addEventListener("click", () => dlg.close());
+
+      $("form-config").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        mostrar("");
+
+        const nome = $("cfg-nome").value.trim();
+        const email = $("cfg-email").value.trim();
+        const numero = normalizarWhats($("cfg-whats").value);
+        const senha = $("cfg-senha").value;
+        const senha2 = $("cfg-senha2").value;
+
+        if (!email) return mostrar("Informe o e-mail.", "erro");
+        if (!numero) return mostrar("Informe um WhatsApp válido com DDD, por exemplo (41) 99999-9999.", "erro");
+        if (senha || senha2) {
+          if (senha.length < 6) return mostrar("A nova senha precisa ter pelo menos 6 caracteres.", "erro");
+          if (senha !== senha2) return mostrar("As duas senhas não são iguais.", "erro");
+        }
+
+        const salvar = $("cfg-salvar");
+        salvar.disabled = true;
+        salvar.textContent = "Salvando...";
+
+        const mudouEmail = email.toLowerCase() !== emailAtual.toLowerCase();
+        const atributos = { data: { nome, whatsapp: numero } };
+        if (mudouEmail) atributos.email = email;
+        if (senha) atributos.password = senha;
+
+        const { error } = await db.auth.updateUser(atributos);
+        if (error) {
+          salvar.disabled = false;
+          salvar.textContent = "Salvar alterações";
+          return mostrar("Não foi possível salvar: " + error.message, "erro");
+        }
+
+        const { error: erroContato } = await db.from("contatos").upsert(
+          { user_id: estado.usuarioId, whatsapp: numero, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+
+        salvar.disabled = false;
+        salvar.textContent = "Salvar alterações";
+
+        if (erroContato) return mostrar("Seus dados foram salvos, mas o WhatsApp não: " + erroContato.message, "erro");
+
+        $("usuario").textContent = nome || emailAtual;
+        $("cfg-senha").value = "";
+        $("cfg-senha2").value = "";
+
+        mostrar(
+          mudouEmail
+            ? "Quase lá! Enviamos um link de confirmação para o novo e-mail (e também para o antigo). O e-mail só muda depois que você confirmar."
+            : "Alterações salvas.",
+          "ok"
+        );
+      });
+    })();
+
+    // ================= ANÚNCIOS =================
+    function renderAds() {
+      const caixas = document.querySelectorAll(".anuncio");
+      if (!ADS.ativo) { caixas.forEach((c) => c.classList.add("oculto")); return; }
+
+      if (!document.getElementById("script-ads")) {
+        const s = document.createElement("script");
+        s.id = "script-ads";
+        s.async = true;
+        s.crossOrigin = "anonymous";
+        s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS.cliente}`;
+        document.head.append(s);
+      }
+      caixas.forEach((box) => {
+        box.classList.remove("oculto");
+        if (box.dataset.pronto) return;
+        box.dataset.pronto = "1";
+        const ins = document.createElement("ins");
+        ins.className = "adsbygoogle";
+        ins.style.display = "block";
+        ins.setAttribute("data-ad-client", ADS.cliente);
+        ins.setAttribute("data-ad-slot", ADS.slot);
+        ins.setAttribute("data-ad-format", "auto");
+        ins.setAttribute("data-full-width-responsive", "true");
+        box.append(ins);
+        try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
+      });
+    }
+  </script>
+</body>
+</html>
